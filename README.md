@@ -8,6 +8,7 @@
 <br/>
 
 <p align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/mobeigi/windhawk-taskbar-badge-control?style=flat-square" alt="Latest release"/></a>
   <a href="../../actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/mobeigi/windhawk-taskbar-badge-control/build.yml?branch=main&amp;style=flat-square" alt="Build"/></a>
   <a href="../../issues"><img src="https://img.shields.io/github/issues/mobeigi/windhawk-taskbar-badge-control.svg?style=flat-square" alt="Issues"/></a>
   <a href="../../pulls"><img src="https://img.shields.io/github/issues-pr/mobeigi/windhawk-taskbar-badge-control.svg?style=flat-square" alt="Pull requests"/></a>
@@ -123,9 +124,8 @@ that single-file submission.
 
 ## Contributions
 
-Contributions are welcome. Open an [issue](../../issues) to discuss a change, or
-make a [pull request](../../pulls). Run the build/checks and describe any taskbar
-behavior you tested.
+Contributions are always welcome!
+Just make a [pull request](../../pulls).
 
 ## Credits
 
