@@ -1,0 +1,34 @@
+# Generated builds and local diagnostics
+/build/
+/diagnostics/
+*.exe
+*.dll
+*.obj
+*.o
+*.pdb
+*.ilk
+*.log
+
+# Editable artwork stays local; publish the JPEG exports
+*.psd
+*.psb
+
+# Local environment files and private signing material
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Editor and operating-system files
+/.vs/
+/.vscode/
+*.user
+*.suo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
