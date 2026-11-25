@@ -28,7 +28,7 @@ taskbar. Disabling the mod restores Windows-controlled badge appearance.
 
 ## Requirements
 
-- Windows 11 x64 with the native taskbar. Windows 10, ARM64, and replacement
+- Windows 11 with the native x64 or ARM64 taskbar. Windows 10 and replacement
   taskbars are not supported.
 - [Windhawk](https://windhawk.net/). Builds are checked with Windhawk 1.7.3.
 - **Show badges on taskbar apps** enabled under **Settings → Personalization →
@@ -95,18 +95,19 @@ The mod is a single self-contained source file at the repository root. To build
 and run the standalone checks with a local Windhawk installation:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Architecture all -Test
 ```
 
 For a non-default installation, pass `-WindhawkDirectory "D:\Tools\Windhawk"`.
-Output goes to the ignored `build/` directory. This does not enable the mod or
-inject it into Explorer.
+Output goes to the ignored `build/x64/` and `build/arm64/` directories. Omit
+`-Architecture all` for an x64-only build, or use `-Architecture arm64` for ARM64
+only. Building does not enable the mod or inject it into Explorer.
 
 The [Build workflow](../../actions/workflows/build.yml) runs on pushes to `main`,
 pull requests, and manual dispatch. It uses a pinned, checksum-verified Windhawk
-1.7.3 portable toolchain to compile the mod and run the checks. It does not install
-the mod in Explorer or test taskbar rendering. After its first successful run,
-the **Build and test (Windows x64)** check can be required by branch protection.
+1.7.3 portable toolchain to compile both architectures and run the x64 checks.
+It does not install the mod in Explorer or test taskbar rendering. The
+**Build and test (Windows)** check can be required by branch protection.
 
 See [`TESTING.md`](TESTING.md) for runtime regression checks. Basic filtering and
 immediate enable/disable behavior have been tested on Windows 11 build
@@ -136,6 +137,7 @@ were adapted from or informed by m417z's GPL-3.0 Windhawk mods:
 - [Taskbar Height and Icon Size](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/taskbar-icon-size.wh.cpp)
 - [Start Button Position](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/taskbar-start-button-position.wh.cpp)
 - [Taskbar Reorder by Right Drag](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/taskbar-reorder-right-drag.wh.cpp)
+- [Taskbar Multirow](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/taskbar-multirow.wh.cpp)
 
 
 ## Licence

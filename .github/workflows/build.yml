@@ -19,7 +19,7 @@ defaults:
 
 jobs:
   build:
-    name: Build and test (Windows x64)
+    name: Build and test (Windows)
     runs-on: windows-2025
     timeout-minutes: 20
     steps:
@@ -52,5 +52,5 @@ jobs:
           }
           "WINDHAWK_DIRECTORY=$windhawk" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Build mod and run checks
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -WindhawkDirectory "$env:WINDHAWK_DIRECTORY" -Test
+      - name: Build x64 and ARM64; run x64 checks
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -WindhawkDirectory "$env:WINDHAWK_DIRECTORY" -Architecture all -Test

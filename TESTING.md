@@ -2,18 +2,25 @@
 
 ## Automated checks
 
-Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Test`.
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Architecture all -Test`.
 The checks exercise the actual source helpers with inert Windhawk API stubs:
 
 - Rule normalization, exact matching, and both filtering modes.
-- Native host-layout decoding and rejection of unsupported patterns.
+- x64 and ARM64 host-layout decoding, including truncated/unaligned input,
+  unsupported patterns, and independent x64 stack-frame sizes.
+- Unicode matching using invariant Windows casing rather than the CRT locale.
 - Retaining executable identities for windowless groups.
 - Process-path cache hits and invalidation on app/window/PID changes.
 - Process-query deduplication for groups with several windows.
 - Coalescing pending button/container updates and returning to an empty queue.
 - Including both badge mechanisms while excluding base icons and progress.
+- Keeping the original opacity through animation-style notifications which
+  still expose the mod-owned local zero, including when the animation ends.
+- Cleanup exception isolation and explicit state-container lifetime.
 
 These do not execute the Explorer hooks or XAML event subscriptions.
+On x64 hosts, ARM64 outputs are cross-compiled while the x64 executable tests
+both decoder helpers.
 
 ## Runtime regression checklist
 
@@ -36,6 +43,24 @@ establish that every Explorer lifecycle path works correctly:
    monitor. No taskbar interaction should be needed to discover new roots.
 8. Restart Explorer with the mod enabled. Then disable/re-enable several times.
    Check cleanup, absence of crashes, and restoration of badge appearance.
+9. With the mod enabled and its list empty, start a fresh Explorer session. Add
+   a rule afterward and save without hovering over the taskbar. Existing badges
+   must update immediately, even if Taskbar.View.dll loaded after initialization.
+10. Trigger badge updates and theme/template changes while filtering, then
+    disable. Badges must return to their native appearance instead of retaining
+    the mod's local zero. Repeat with an allowed app to check it stays unchanged.
+
+Test graceful process shutdown separately when convenient (sign out or reboot).
+Windhawk unload callbacks do not run on that path. A forced process kill does
+not exercise global destructors and therefore does not validate shutdown safety.
+The XAML-owning state deliberately has no automatic process-exit destructor;
+controlled unload releases it explicitly on its owning UI thread.
+
+Cleanup errors are logged rather than allowed to escape a window procedure.
+If callbacks cannot be safely revoked or UI-owned state cannot be released,
+the mod remains mapped but inert until Explorer exits. An attempt to re-enable
+that same DLL asks for an Explorer restart. Report that error rather than treating
+it as a successful unload; this is an exceptional safety path, not normal behavior.
 
 If something fails, use Windhawk's built-in logging. Relevant messages include
 the startup root/button counts, application policy changes, and HRESULT errors.
@@ -47,8 +72,10 @@ Review log output for personal paths before sharing it.
 a pinned Windhawk 1.7.3 portable toolchain. The offline installer is verified
 against its published SHA-256 before extraction. The mod is only compiled; it
 is not installed in Explorer. Standalone tests use inert Windhawk API stubs.
+Both architectures are built; ARM64 standalone checks are cross-compiled while
+the x64 checks run on the hosted x64 runner.
 
-Keep the **Build and test (Windows x64)** job name stable if it is selected as a
+Keep the **Build and test (Windows)** job name stable if it is selected as a
 required pull-request check. Fork pull requests run without repository secrets,
 with read-only repository permissions and without persisted checkout credentials.
 
