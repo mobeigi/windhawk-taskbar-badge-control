@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: powershell
+
+jobs:
+  build:
+    name: Build and test (Windows x64)
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Prepare Windhawk toolchain
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $installer = Join-Path $env:RUNNER_TEMP 'windhawk-1.7.3-offline.exe'
+          $windhawk = Join-Path $env:RUNNER_TEMP 'windhawk-1.7.3'
+          $url = 'https://github.com/ramensoftware/windhawk/releases/download/v1.7.3/windhawk_setup_offline.exe'
+          $expected = '4d93016570f982326eebdfc9068e924ff21f6448534ea32672bb4c1d52a8193b'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) {
+            throw 'Windhawk installer checksum mismatch.'
+          }
+
+          # Use the official portable extraction mode. /D must be the last
+          # argument and must not be quoted, even if the destination has spaces.
+          $process = Start-Process -FilePath $installer -ArgumentList "/S /PORTABLE /D=$windhawk" -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Windhawk extraction failed: $($process.ExitCode)"
+          }
+          if (-not (Test-Path (Join-Path $windhawk 'Compiler\bin\clang++.exe'))) {
+            throw 'The portable Windhawk compiler was not extracted.'
+          }
+          "WINDHAWK_DIRECTORY=$windhawk" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build mod and run checks
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -WindhawkDirectory "$env:WINDHAWK_DIRECTORY" -Test
