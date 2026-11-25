@@ -10,7 +10,7 @@ Assert-Contract ($source -match '(?m)^// @author\s+mobeigi\s*$') 'author metadat
 Assert-Contract ($source -match '(?m)^// @github\s+https://github\.com/mobeigi\s*$') 'GitHub profile metadata'
 Assert-Contract ($source -match '(?m)^// @homepage\s+https://mobeigi\.com/\s*$') 'homepage metadata'
 Assert-Contract ($source -match '(?m)^// @license\s+GPL-3\.0-only\s*$') 'GPL license metadata'
-Assert-Contract ($source -match '(?m)^// @architecture\s+amd64\s*$') 'explicit x64-only architecture'
+Assert-Contract ($source -match '(?m)^// @architecture\s+x86-64\s*$') 'explicit x64-only architecture'
 Assert-Contract ($source -match '(?m)^// @version\s+\d+\.\d+\.\d+\s*$') 'release version metadata'
 Assert-Contract ($source -notmatch 'Wh_Log\(L"Taskbar hooks ready \([0-9]') 'no duplicated version in startup log'
 Assert-Contract ($source -match '(?m)^// @description\s+Show or hide taskbar badges per application \(Windows 11\)\.\s*$') 'description metadata'

@@ -8,7 +8,7 @@
 // @homepage        https://mobeigi.com/
 // @license         GPL-3.0-only
 // @include         explorer.exe
-// @architecture    amd64
+// @architecture    x86-64
 // @compilerOptions -lole32 -loleaut32 -lruntimeobject -lcomctl32
 // ==/WindhawkMod==
 
@@ -198,6 +198,7 @@ bool InstallNativeRootSymbols() {
     HMODULE module = GetModuleHandleW(L"taskbar.dll");
     if (!module) module = LoadLibraryExW(L"taskbar.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!module) return false;
+    // taskbar.dll
     WindhawkUtils::SYMBOL_HOOK symbols[] = {
         {{LR"(const CTaskBand::`vftable'{for `ITaskListWndSite'})"}, &g_primaryBandVtable},
         {{LR"(const CSecondaryTaskBand::`vftable'{for `ITaskListWndSite'})"}, &g_secondaryBandVtable},
@@ -1217,6 +1218,7 @@ HWND WINAPI CreateWindowHook(DWORD exStyle, LPCWSTR className, LPCWSTR title, DW
 }
 
 bool InstallTaskbarHooks(HMODULE module) {
+    // Taskbar.View.dll, ExplorerExtensions.dll
     WindhawkUtils::SYMBOL_HOOK symbols[] = {
         {{LR"(const winrt::impl::produce<struct winrt::Taskbar::implementation::TaskListButton,struct winrt::Taskbar::ITaskListButton>::`vftable')"},
          &g_buttonVtable},
