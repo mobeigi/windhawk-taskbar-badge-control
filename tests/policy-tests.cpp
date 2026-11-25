@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <stdexcept>
 
 int g_checks = 0;
 
@@ -15,19 +16,45 @@ void Check(bool condition, const char* description) {
     }
 }
 
-int main() {
+int RunTests() {
     BYTE prologue[] = {0x48, 0x83, 0xec, 0x28, 0x48, 0x83, 0xc1, 0x48};
-    Check(DecodeHostElementOffset(prologue, 8) == 0x48, "decode known x64 hosted-element offset");
-    Check(!DecodeHostElementOffset(prologue, 7), "reject truncated host prologue");
+    Check(DecodeHostElementOffsetX64(prologue, 8) == 0x48, "decode known x64 hosted-element offset");
+    Check(!DecodeHostElementOffsetX64(prologue, 7), "reject truncated host prologue");
+    prologue[3] = 0x38;
+    Check(DecodeHostElementOffsetX64(prologue, 8) == 0x48, "x64 stack-frame size is independent of the field offset");
     prologue[7] = 0x10;
-    Check(DecodeHostElementOffset(prologue, 8) == 0x10, "decode alternative aligned host offset");
+    Check(DecodeHostElementOffsetX64(prologue, 8) == 0x10, "decode alternative aligned host offset");
     prologue[7] = 0x11;
-    Check(!DecodeHostElementOffset(prologue, 8), "reject misaligned host offset");
+    Check(!DecodeHostElementOffsetX64(prologue, 8), "reject misaligned host offset");
     prologue[7] = 0;
-    Check(!DecodeHostElementOffset(prologue, 8), "reject zero host offset instead of guessing");
+    Check(!DecodeHostElementOffsetX64(prologue, 8), "reject zero host offset instead of guessing");
     prologue[7] = 0x48;
     prologue[0] = 0xe9;
-    Check(!DecodeHostElementOffset(prologue, 8), "reject unrecognized or detoured prologue");
+    Check(!DecodeHostElementOffsetX64(prologue, 8), "reject unrecognized or detoured prologue");
+    prologue[0] = 0x48;
+
+    DWORD armPrologue[] = {0xD503237F, 0xA9BF7BFD, 0x910003FD, 0xF8410C08};
+    auto armBytes = reinterpret_cast<BYTE const*>(armPrologue);
+    Check(DecodeHostElementOffsetArm64(armBytes, 16) == 0x10, "decode known ARM64 hosted-element offset on any test host");
+    Check(!DecodeHostElementOffsetArm64(armBytes, 15), "reject truncated ARM64 prologue");
+    armPrologue[3] = 0xF8448C08;
+    Check(DecodeHostElementOffsetArm64(armBytes, 16) == 0x48, "decode alternative ARM64 field offset");
+    BYTE unaligned[17];
+    std::memcpy(unaligned + 1, armPrologue, sizeof(armPrologue));
+    Check(DecodeHostElementOffsetArm64(unaligned + 1, 16) == 0x48, "ARM64 byte decoding does not depend on input alignment");
+    armPrologue[3] = 0xF8411C08;
+    Check(!DecodeHostElementOffsetArm64(armBytes, 16), "reject misaligned ARM64 field offset");
+    armPrologue[3] = 0xF8400C08;
+    Check(!DecodeHostElementOffsetArm64(armBytes, 16), "reject zero ARM64 field offset");
+    armPrologue[3] = 0xF8410C08;
+    armPrologue[0] = 0xD503201F;
+    Check(!DecodeHostElementOffsetArm64(armBytes, 16), "reject unsupported ARM64 instruction sequence");
+    armPrologue[0] = 0xD503237F;
+#if defined(_M_X64)
+    Check(DecodeHostElementOffset(prologue, 8) == 0x48, "native x64 decoder dispatch");
+#elif defined(_M_ARM64)
+    Check(DecodeHostElementOffset(armBytes, 16) == 0x10, "native ARM64 decoder dispatch");
+#endif
 
     Settings settings;
     settings.applications.insert(Normalize(L"chrome.exe"));
@@ -44,6 +71,13 @@ int main() {
 
     Check(Normalize(L" \tChrome.EXE\r\n") == L"CHROME.EXE", "normalize case and outer whitespace");
     Check(Normalize(L" \t\r\n").empty(), "empty normalized rule");
+    Check(Normalize(L" \u00e9\u00f6\u03c9\u044f.exe ") == L"\u00c9\u00d6\u03a9\u042f.EXE", "invariant Unicode matching across Latin Greek and Cyrillic");
+    Settings unicodeRules;
+    unicodeRules.applications = {Normalize(L"C:\\caf\u00e9\\process.exe")};
+    Identity unicodePath{L"Example", {L"c:\\CAF\u00c9\\PROCESS.EXE"}};
+    Check(ShouldHide(unicodePath, unicodeRules), "non-ASCII path matches case-insensitively");
+    unicodeRules.applications = {Normalize(L"Editeur.\u00e9")};
+    Check(ShouldHide(Identity{L"EDITEUR.\u00c9", {}}, unicodeRules), "non-ASCII application ID matches case-insensitively");
     Check(ShouldHide(chrome, settings), "blocklist executable name");
     Check(!ShouldHide(other, settings), "blocklist leaves other apps alone");
     Check(!ShouldHide(unknown, settings), "blocklist unknown identity fails open");
@@ -177,6 +211,52 @@ int main() {
     work = {};
     Check(!work.HasWork() && !work.posted, "drained queue returns to idle");
 
+    Mask snapshot;
+    Data::Binding noBinding{nullptr};
+    auto zero = winrt::box_value(0.0);
+    auto one = winrt::box_value(1.0);
+    Check(UpdateMaskSnapshot(snapshot, one, noBinding, true), "capture the initial native opacity");
+    Check(!UpdateMaskSnapshot(snapshot, zero, noBinding), "do not capture the mod-owned local zero during an animation");
+    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 1.0, "effective-value notification preserves original opacity");
+    Check(!UpdateMaskSnapshot(snapshot, zero, noBinding), "animation ending at local zero also preserves the original");
+    Check(UpdateMaskSnapshot(snapshot, winrt::box_value(0.25), noBinding), "a genuine new local opacity replaces the snapshot");
+    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 0.25, "save the latest native base opacity");
+    Check(UpdateMaskSnapshot(snapshot, nullptr, noBinding), "cleared local value replaces the snapshot");
+    Check(!snapshot.originalLocal, "cleared snapshot remains unset");
+    Check(UpdateMaskSnapshot(snapshot, zero, noBinding, true), "an initially zero native opacity is a legitimate original");
+    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 0.0, "preserve an initially hidden native badge");
+    Check(!IsMaskOpacity(winrt::box_value(L"binding-like value")), "non-numeric local values are not mistaken for the masking zero");
+
+    bool previousFailure = g_cleanupFailed.load();
+    int cleanups = 0;
+    Check(!CleanupAction(L"injected test failure", [] { throw std::runtime_error("test"); }), "cleanup exceptions do not escape");
+    Check(g_cleanupFailed, "cleanup failure is recorded instead of silently discarded");
+    Check(CleanupAction(L"following cleanup", [&] { ++cleanups; }), "later cleanup still runs after a failure");
+    Check(cleanups == 1, "remaining resources are not skipped after a cleanup exception");
+    g_cleanupFailed = previousFailure;
+
+    RestoreAll(state);
+    Check(state.cleanupComplete && state.identityPaths.empty(), "controlled cleanup releases state and records completion");
+    auto emptyState = std::make_shared<ThreadState>();
+    (*g_states)[123] = emptyState;
+    Check(StatesSnapshot().size() == 1, "state snapshot works with explicit-lifetime container");
+    RestoreAll(*emptyState);
+    g_states.reset();
+    Check(StatesSnapshot().empty(), "state lookup is safe after explicit container reset");
+    g_states.emplace();
+
     std::printf("All %d checks passed.\n", g_checks);
     return 0;
+}
+
+int main() {
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        int result = RunTests();
+        winrt::uninit_apartment();
+        return result;
+    } catch (winrt::hresult_error const& error) {
+        std::fprintf(stderr, "WinRT test failure: %08X\n", static_cast<unsigned>(error.code().value));
+        return 1;
+    }
 }

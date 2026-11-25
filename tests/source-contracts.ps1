@@ -10,7 +10,7 @@ Assert-Contract ($source -match '(?m)^// @author\s+mobeigi\s*$') 'author metadat
 Assert-Contract ($source -match '(?m)^// @github\s+https://github\.com/mobeigi\s*$') 'GitHub profile metadata'
 Assert-Contract ($source -match '(?m)^// @homepage\s+https://mobeigi\.com/\s*$') 'homepage metadata'
 Assert-Contract ($source -match '(?m)^// @license\s+GPL-3\.0-only\s*$') 'GPL license metadata'
-Assert-Contract ($source -match '(?m)^// @architecture\s+x86-64\s*$') 'explicit x64-only architecture'
+Assert-Contract ($source -match '(?m)^// @architecture\s+x86-64\s*$') 'Windhawk native x64 and ARM64 architecture selector'
 Assert-Contract ($source -match '(?m)^// @version\s+\d+\.\d+\.\d+\s*$') 'release version metadata'
 Assert-Contract ($source -notmatch 'Wh_Log\(L"Taskbar hooks ready \([0-9]') 'no duplicated version in startup log'
 Assert-Contract ($source -match '(?m)^// @description\s+Show or hide taskbar badges per application \(Windows 11\)\.\s*$') 'description metadata'
@@ -27,9 +27,9 @@ Assert-Contract ($readme -notmatch 'PLACEHOLDER' -and $usageMatch.Groups[1].Valu
 Assert-Contract ($readme.Contains('Show badges on taskbar apps')) 'required Windows setting documented'
 Assert-Contract ($readme -match "(?s)If this setting is disabled.*?cannot show badges") 'disabled global setting overrides app rules'
 Assert-Contract ($readme.Contains('**show badges by default**') -and $readme -match '\*\*hide badges by\s+default\*\*') 'both filtering modes emphasized in prose'
-Assert-Contract ($readme -match '(?s)## Limits\s+- Only the native Windows 11 x64 taskbar is supported\.\s+- Badges drawn into an.*?base icon cannot be removed\.\s*$') 'two limitation bullets grouped at the end'
+Assert-Contract ($readme -match '(?s)## Limits.*?x64 and ARM64.*?base icon cannot be removed.*?identity cannot be resolved keep their badges\.\s*$') 'architecture and identification limits documented at the end'
 $visibleReadme = [regex]::Replace($readme, '(?s)<!--.*?-->', '')
-Assert-Contract ([regex]::Matches($visibleReadme, '\S+').Count -le 200) 'concise user-facing README'
+Assert-Contract ([regex]::Matches($visibleReadme, '\S+').Count -le 220) 'concise user-facing README'
 
 $settingsMatch = [regex]::Match($source, '(?s)// ==WindhawkModSettings==\s*/\*(.*?)\*/\s*// ==/WindhawkModSettings==')
 Assert-Contract $settingsMatch.Success 'embedded settings block exists'
@@ -46,6 +46,13 @@ Assert-Contract ($source -notmatch 'SaveDiagnostic|diagnosticLogging|hideOverlay
 Assert-Contract ([regex]::Matches($source, '\bSetTimer\s*\(').Count -eq 1) 'one bounded retry timer site'
 Assert-Contract ($source -match 'state\.retryCount < 8' -and $source -match 'SetTimer\(state\.window, g_controlMessage, 250, nullptr\)') 'retry limit and short delay'
 Assert-Contract ($source -match '(?s)message == WM_TIMER.*?KillTimer\(window, g_controlMessage\).*?Refresh\(state\)') 'retry timer killed before processing'
+Assert-Contract ($source -match '(?s)\[\[clang::no_destroy\]\]\s+std::optional<std::map<DWORD, std::shared_ptr<ThreadState>>>') 'XAML state is not destroyed automatically at process exit'
+Assert-Contract ($source -match 'g_states\.reset\(\)' -and $source -match 'cleanupComplete\.load\(\)') 'explicit state destruction waits for UI-thread cleanup'
+Assert-Contract ($source -match '(?s)void Wh_ModSettingsChanged\(\).*?states.empty\(\) && g_hooksReady.*?BootstrapExistingTaskbars\(\)') 'settings changes bootstrap missing states after a late DLL load'
+Assert-Contract ($source -match 'StringSetting::make' -and $source -notmatch 'Wh_FreeStringSetting') 'settings strings use RAII'
+Assert-Contract ($source -match '(?s)std::set<DWORD> visited.*?RunFromWindowThread') 'bootstrap deduplicates UI threads'
+Assert-Contract ($source -match '(?s)DWORD prologue\[4\].*?sizeof\(prologue\)') 'native decoder reads an aligned sixteen-byte prologue'
+Assert-Contract ($source -match 'LOCALE_NAME_INVARIANT, LCMAP_UPPERCASE' -and $source -notmatch 'towupper') 'Unicode matching is independent of the host CRT locale'
 
 $lines = $source -split '\r?\n'
 $references = @(for ($i = 0; $i -lt $lines.Count; ++$i) { if ($lines[$i] -match 'm417z') { $i } })
