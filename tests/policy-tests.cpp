@@ -211,29 +211,16 @@ int RunTests() {
     work = {};
     Check(!work.HasWork() && !work.posted, "drained queue returns to idle");
 
-    Mask snapshot;
-    Data::Binding noBinding{nullptr};
-    auto zero = winrt::box_value(0.0);
-    auto one = winrt::box_value(1.0);
-    Check(UpdateMaskSnapshot(snapshot, one, noBinding, true), "capture the initial native opacity");
-    Check(!UpdateMaskSnapshot(snapshot, zero, noBinding), "do not capture the mod-owned local zero during an animation");
-    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 1.0, "effective-value notification preserves original opacity");
-    Check(!UpdateMaskSnapshot(snapshot, zero, noBinding), "animation ending at local zero also preserves the original");
-    Check(UpdateMaskSnapshot(snapshot, winrt::box_value(0.25), noBinding), "a genuine new local opacity replaces the snapshot");
-    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 0.25, "save the latest native base opacity");
-    Check(UpdateMaskSnapshot(snapshot, nullptr, noBinding), "cleared local value replaces the snapshot");
-    Check(!snapshot.originalLocal, "cleared snapshot remains unset");
-    Check(UpdateMaskSnapshot(snapshot, zero, noBinding, true), "an initially zero native opacity is a legitimate original");
-    Check(winrt::unbox_value<double>(snapshot.originalLocal) == 0.0, "preserve an initially hidden native badge");
+    Check(IsMaskOpacity(winrt::box_value(0.0)), "recognize the local masking zero");
+    Check(!IsMaskOpacity(winrt::box_value(1.0)), "native visible opacity is not the masking zero");
+    Check(!IsMaskOpacity(winrt::box_value(0.25)), "native partial opacity is not the masking zero");
+    Check(!IsMaskOpacity(nullptr), "cleared local opacity is not the masking zero");
     Check(!IsMaskOpacity(winrt::box_value(L"binding-like value")), "non-numeric local values are not mistaken for the masking zero");
 
-    bool previousFailure = g_cleanupFailed.load();
     int cleanups = 0;
     Check(!CleanupAction(L"injected test failure", [] { throw std::runtime_error("test"); }), "cleanup exceptions do not escape");
-    Check(g_cleanupFailed, "cleanup failure is recorded instead of silently discarded");
     Check(CleanupAction(L"following cleanup", [&] { ++cleanups; }), "later cleanup still runs after a failure");
     Check(cleanups == 1, "remaining resources are not skipped after a cleanup exception");
-    g_cleanupFailed = previousFailure;
 
     RestoreAll(state);
     Check(state.cleanupComplete && state.identityPaths.empty(), "controlled cleanup releases state and records completion");
@@ -244,6 +231,18 @@ int RunTests() {
     g_states.reset();
     Check(StatesSnapshot().empty(), "state lookup is safe after explicit container reset");
     g_states.emplace();
+
+    Wh_ModBeforeUninit();
+    Check(g_unloading && !g_states, "unload releases cleaned state despite an earlier action failure");
+    auto strandedState = std::make_shared<ThreadState>();
+    g_states.emplace();
+    (*g_states)[123] = strandedState;
+    Wh_ModBeforeUninit();
+    Check(g_states.has_value() && !strandedState->cleanupComplete,
+          "unload retains state when its UI-thread cleanup cannot run");
+    RestoreAll(*strandedState);
+    Wh_ModBeforeUninit();
+    Check(!g_states, "completed UI-thread cleanup permits explicit container destruction");
 
     std::printf("All %d checks passed.\n", g_checks);
     return 0;

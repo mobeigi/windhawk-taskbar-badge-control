@@ -14,9 +14,9 @@ The checks exercise the actual source helpers with inert Windhawk API stubs:
 - Process-query deduplication for groups with several windows.
 - Coalescing pending button/container updates and returning to an empty queue.
 - Including both badge mechanisms while excluding base icons and progress.
-- Keeping the original opacity through animation-style notifications which
-  still expose the mod-owned local zero, including when the animation ends.
-- Cleanup exception isolation and explicit state-container lifetime.
+- Recognizing the local masking zero without confusing other opacity values.
+- Cleanup exception isolation, explicit state-container lifetime, and retaining
+  state when its owning UI thread is unavailable.
 
 These do not execute the Explorer hooks or XAML event subscriptions.
 On x64 hosts, ARM64 outputs are cross-compiled while the x64 executable tests
@@ -57,10 +57,8 @@ The XAML-owning state deliberately has no automatic process-exit destructor;
 controlled unload releases it explicitly on its owning UI thread.
 
 Cleanup errors are logged rather than allowed to escape a window procedure.
-If callbacks cannot be safely revoked or UI-owned state cannot be released,
-the mod remains mapped but inert until Explorer exits. An attempt to re-enable
-that same DLL asks for an Explorer restart. Report that error rather than treating
-it as a successful unload; this is an exceptional safety path, not normal behavior.
+If an owning UI thread is unavailable, its state is left allocated rather than
+released on the wrong thread. The mod does not pin its DLL or block re-enabling.
 
 If something fails, use Windhawk's built-in logging. Relevant messages include
 the startup root/button counts, application policy changes, and HRESULT errors.
